@@ -47,5 +47,3 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
 
       - run: CI=true pnpm exec nx affected -t test
-
-      - run: pnpm exec pkg-pr-new publish --peerDeps ./packages/*
