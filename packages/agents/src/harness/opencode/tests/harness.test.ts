@@ -149,6 +149,35 @@ describe("OpenCodeHarness on OpenCode v2", () => {
     expect(await stub.holdRuns()).toBe(2);
   });
 
+  it("answers a wait as soon as its run ends", async () => {
+    const stub = fresh();
+    // The pause for a run resuming after an eviction is heartbeatMs / 30:
+    // a minute here, past the test timeout.
+    await stub.setHeartbeat(30 * 60_000);
+    const receipt = await stub.submit("hold");
+    await stub.holdStarted(1);
+    const waiting = stub.wait(receipt.operationId);
+    await stub.release();
+    expect(await waiting).toMatchObject({ status: "done", text: "echo: hold" });
+  });
+
+  it("answers a wait begun after a crash, before the alarm resumes the run", async () => {
+    const name = crypto.randomUUID();
+    let stub = fresh(name);
+    const receipt = await stub.submit("hold");
+    await stub.holdStarted(1);
+    await abortAllDurableObjects();
+    stub = fresh(name);
+    // Begun before the run resumes, the wait finds the session idle with the
+    // operation unsettled.
+    const waiting = stub.wait(receipt.operationId);
+    await runDurableObjectAlarm(stub);
+    await stub.holdStarted(2);
+    await stub.release();
+    expect(await waiting).toMatchObject({ status: "done", text: "echo: hold" });
+    expect(await stub.holdRuns()).toBe(2);
+  });
+
   it("withdraws a queued operation, and aborts the running work", async () => {
     const stub = fresh();
     const held = await stub.submit("hold");

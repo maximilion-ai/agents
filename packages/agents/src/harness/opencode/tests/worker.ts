@@ -167,6 +167,10 @@ export class OpenCodeHarnessTestObject extends DurableObject<Cloudflare.Env> {
     return (await this.ctx.storage.get<number>(HOLD_RUNS_KEY)) ?? 0;
   }
 
+  setHeartbeat(heartbeatMs: number): void {
+    setWakeTimingForTests(this.harness, { heartbeatMs });
+  }
+
   /** Open streams, by id, for tests that read events in steps. */
   readonly #streams = new Map<
     string,
