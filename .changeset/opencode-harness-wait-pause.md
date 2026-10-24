@@ -2,4 +2,4 @@
 "agents": patch
 ---
 
-`OpenCodeHarness`: `wait()` and `prompt()` return as soon as the run ends. They paused 1 second after every run, a pause meant only for a run resuming after an eviction.
+Remove the unnecessary post-run delay from `OpenCodeHarness.wait()` and `prompt()`, while retaining the recovery pause. See the [OpenCode harness example](https://github.com/cloudflare/agents/tree/main/examples/next/harnesses/opencode).
