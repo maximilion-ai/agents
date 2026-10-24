@@ -538,6 +538,7 @@ export class OpenCodeHarness extends LifecycleCapability {
                 signal ? { signal } : undefined
               )
             );
+            this.#probe("settled:after-wait", session);
             // Idle while the operation is unsettled: the run is between an
             // eviction and its resume. Let the wake job bring it back.
             if ((await opencode.sessions.active())[session] === undefined) {
@@ -598,6 +599,15 @@ export class OpenCodeHarness extends LifecycleCapability {
     return created.id;
   }
 
+  #probe(label: string, session: string): void {
+    try {
+      this.lifecycle.jobs.get("probe");
+      console.log(`[probe] OK ${label} ${session}`);
+    } catch {
+      console.log(`[probe] CROSS ${label} ${session}`);
+    }
+  }
+
   // ── The wake ─────────────────────────────────────────────────────────────
 
   /** Schedule the session's wake job now, or pull it forward. */
@@ -621,16 +631,21 @@ export class OpenCodeHarness extends LifecycleCapability {
    */
   async #wakeStep(session: OpenCodeSessionId): Promise<LifecycleJobOutcome> {
     const heartbeat = { rescheduleAt: Date.now() + this.#heartbeatMs };
+    this.#probe("wakeStep:start", session);
     if (this.#waits.has(session)) return heartbeat;
     const opencode = await this.#open();
+    this.#probe("wakeStep:after-open", session);
     if ((await this.#info(opencode, session)) === undefined) return undefined;
 
     // Read in this order: OpenCode takes an input off the inbox before it
     // writes the user message, and only while the session is running. So
     // whatever moment the reads straddle, one of them sees the work.
     const inbox = await opencode.sessions.inbox.list({ sessionID: session });
+    this.#probe("wakeStep:after-inbox", session);
     const open = await unsettled(opencode, session);
+    this.#probe("wakeStep:after-unsettled", session);
     const running = (await opencode.sessions.active())[session] !== undefined;
+    this.#probe("wakeStep:after-active", session);
     if (!running) {
       // A move is applied by OpenCode between turns and cannot start one,
       // so only an input, synthetic message or compaction rings.
@@ -650,6 +665,7 @@ export class OpenCodeHarness extends LifecycleCapability {
     }
 
     const wait = this.#waitForIdle(opencode, session).finally(() => {
+      this.#probe("waitForIdle:finally", session);
       this.#waits.delete(session);
       // Re-check now: OpenCode may have started more work, such as a
       // follow-up.
@@ -671,6 +687,7 @@ export class OpenCodeHarness extends LifecycleCapability {
         { sessionID: session },
         { signal: budget.signal }
       );
+      this.#probe("waitForIdle:after-wait", session);
     } catch (error) {
       if (!budget.signal.aborted) {
         this.lifecycle.events.emit("opencode:wake_error", {
